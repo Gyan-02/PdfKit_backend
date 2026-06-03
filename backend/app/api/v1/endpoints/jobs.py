@@ -57,7 +57,8 @@ def get_job(
     return {
         "job_id": job.id,
         "status": job.status,
-        "tool_name": job.tool_name
+        "tool_name": job.tool_name,
+        "owner": (job.user.email if job.user else None)
     }
 
 @router.post("/test-task/{job_id}")
@@ -69,6 +70,28 @@ def run_test_task(
     return {
         "task_id": task.id
     }
+
+@router.get("/{job_id}/status")
+def get_job_status(
+    job_id: int,
+    db: Session = Depends(get_db)
+):
+    job = (
+        db.query(Job)
+        .filter(Job.id == job_id)
+        .first()
+    )
+
+    if not job:
+        return {
+            "message": "Job not found"
+        }
+
+    return {
+        "job_id": job.id,
+        "status": job.status
+    }
+
 
 @router.get("/{job_id}/download")
 def download_job_output(

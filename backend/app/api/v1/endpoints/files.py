@@ -45,3 +45,28 @@ async def upload_file(
         "file_id": db_file.id,
         "filename": db_file.original_filename
     }
+@router.get("/{file_id}")
+def get_file(
+    file_id: int,
+    db: Session = Depends(get_db)
+):
+    db_file = (
+        db.query(File)
+        .filter(File.id == file_id)
+        .first()
+    )
+
+    if not db_file:
+        return {
+            "message": "File not found"
+        }
+
+    return {
+        "file_id": db_file.id,
+        "filename": db_file.original_filename,
+        "owner": (
+            db_file.user.email
+            if db_file.user
+            else None
+        )
+    }

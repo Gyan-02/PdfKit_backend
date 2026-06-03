@@ -17,4 +17,8 @@ celery_app.conf.imports = (
     "app.workers.unlock",
     "app.workers.pdf_to_jpg",
     "app.workers.compress",
+    "app.workers.ai_summarise",
+    "app.workers.ai_translate",
+    "app.workers.ai_rewrite",
+    "app.workers.qr_pdf",
 )

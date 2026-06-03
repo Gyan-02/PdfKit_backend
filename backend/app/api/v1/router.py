@@ -24,9 +24,18 @@ from app.api.v1.endpoints.pdf_to_jpg import (
 from app.api.v1.endpoints.compress import (
     router as compress_router
 )
-
-
-
+from app.api.v1.endpoints.ai_summarise import (
+    router as ai_summarise_router
+)
+from app.api.v1.endpoints.ai_translate import (
+    router as ai_translate_router
+)
+from app.api.v1.endpoints.ai_rewrite import (
+    router as ai_rewrite_router
+)
+from app.api.v1.endpoints.qr_pdf import (
+    router as qr_pdf_router
+)
 
 
 router = APIRouter()
@@ -50,3 +59,9 @@ router.include_router(protect_router)
 router.include_router(unlock_router)
 router.include_router(pdf_to_jpg_router)
 router.include_router(compress_router)
+router.include_router(ai_summarise_router)
+router.include_router(ai_translate_router)
+router.include_router(ai_rewrite_router)
+router.include_router(
+    qr_pdf_router
+)
