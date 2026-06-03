@@ -27,7 +27,7 @@ def watermark_pdf_task(job_id: int):
             return
 
         file_id = job.options["file_id"]
-        watermark_text = job.options["text"]
+        watermark_text = job.options.get("text", "CONFIDENTIAL")
 
         job.status = "processing"
         db.commit()
@@ -48,13 +48,14 @@ def watermark_pdf_task(job_id: int):
             rect = page.rect
 
             page.insert_text(
-                (
-                    rect.width / 3,
-                    rect.height / 2
-                ),
-                watermark_text,
-                fontsize=30
-            )
+            (
+                rect.width * 0.25,
+                rect.height * 0.55
+            ),
+            watermark_text,
+            fontsize=70,
+            color=(0.75, 0.75, 0.75)
+        )
 
         output_dir = Path("outputs")
         output_dir.mkdir(parents=True, exist_ok=True)

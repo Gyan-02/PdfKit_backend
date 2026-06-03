@@ -1,5 +1,5 @@
 import fitz
-
+import shutil
 from pathlib import Path
 from datetime import datetime, UTC
 
@@ -70,8 +70,15 @@ def split_pdf_task(job_id: int):
             new_pdf.close()
 
         doc.close()
+        
+        
+        zip_path = shutil.make_archive(
+           str(output_dir),
+           "zip",
+            str(output_dir)
+        )
 
-        job.output_file_key = str(output_dir)
+        job.output_file_key = zip_path
         job.status = "completed"
         job.completed_at = datetime.now(UTC)
 

@@ -38,7 +38,10 @@ from app.api.v1.endpoints.qr_pdf import (
 )
 
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/api/v1"
+)
+
 
 @router.get("/")
 def home():

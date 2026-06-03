@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-
+from pathlib import Path
 from app.db.dependencies import get_db
 from app.models.job import Job
 from app.schemas.job_schema import (
@@ -109,9 +109,11 @@ def download_job_output(
 
     if not job.output_file_key:
         return {"message": "Output not ready"}
+    
+    file_path = Path(job.output_file_key)
 
     return FileResponse(
-        path=job.output_file_key,
-        filename=f"merged_{job_id}.pdf",
-        media_type="application/pdf"
+        path=str(file_path),
+        filename=file_path.name,
+        
     )

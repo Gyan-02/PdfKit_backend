@@ -1,10 +1,12 @@
 import fitz
+import shutil
 
 from pathlib import Path
 from datetime import datetime, UTC
 
 from app.core.celery_app import celery_app
 from app.db.session import SessionLocal
+
 from app.models.job import Job
 from app.models.file import File
 
@@ -40,7 +42,9 @@ def pdf_to_jpg_task(job_id: int):
         if not db_file:
             raise Exception("File not found")
 
-        doc = fitz.open(db_file.s3_key)
+        doc = fitz.open(
+            db_file.s3_key
+        )
 
         output_dir = (
             Path("outputs")
@@ -65,11 +69,19 @@ def pdf_to_jpg_task(job_id: int):
                 f"page_{page_num + 1}.jpg"
             )
 
-            pix.save(str(image_path))
+            pix.save(
+                str(image_path)
+            )
 
         doc.close()
 
-        job.output_file_key = str(output_dir)
+        zip_path = shutil.make_archive(
+            str(output_dir),
+            "zip",
+            str(output_dir)
+        )
+
+        job.output_file_key = zip_path
         job.status = "completed"
         job.completed_at = datetime.now(UTC)
 
@@ -80,7 +92,9 @@ def pdf_to_jpg_task(job_id: int):
         if job:
             job.status = "failed"
             job.error_message = str(e)
+
             db.commit()
 
     finally:
+
         db.close()
