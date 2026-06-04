@@ -36,6 +36,9 @@ from app.api.v1.endpoints.ai_rewrite import (
 from app.api.v1.endpoints.qr_pdf import (
     router as qr_pdf_router
 )
+from app.api.v1.endpoints.admin import (
+    router as admin_router
+)
 
 
 router = APIRouter(
@@ -67,4 +70,7 @@ router.include_router(ai_translate_router)
 router.include_router(ai_rewrite_router)
 router.include_router(
     qr_pdf_router
+)
+router.include_router(
+    admin_router
 )
