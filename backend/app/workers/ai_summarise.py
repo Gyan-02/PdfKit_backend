@@ -1,4 +1,5 @@
 import fitz
+
 from pathlib import Path
 from datetime import datetime, UTC
 
@@ -11,6 +12,14 @@ from app.db.session import SessionLocal
 
 from app.models.job import Job
 from app.models.file import File
+
+from app.services.file_downloader import (
+    download_file
+)
+
+from app.services.cloudinary_storage import (
+    upload_file
+)
 
 
 @celery_app.task
@@ -44,7 +53,11 @@ def ai_summarise_task(job_id: int):
         if not db_file:
             raise Exception("File not found")
 
-        doc = fitz.open(db_file.s3_key)
+        input_path = download_file(
+            db_file.s3_key
+        )
+
+        doc = fitz.open(input_path)
 
         text = ""
 
@@ -59,21 +72,23 @@ def ai_summarise_task(job_id: int):
             api_key=settings.GROQ_API_KEY
         )
 
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Summarize this PDF in "
-                        "bullet points."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": text
-                }
-            ]
+        response = (
+            client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Summarize this PDF in "
+                            "bullet points."
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": text
+                    }
+                ]
+            )
         )
 
         summary = (
@@ -83,21 +98,44 @@ def ai_summarise_task(job_id: int):
             .content
         )
 
-        output_path = (
-            Path("outputs")
-            / f"summary_{job_id}.txt"
-            )
+        output_dir = Path("outputs")
+        output_dir.mkdir(
+            parents=True,
+            exist_ok=True
+        )
 
-        with open(output_path, "w", encoding="utf-8") as f:
+        output_path = (
+            output_dir /
+            f"summary_{job_id}.txt"
+        )
+
+        with open(
+            output_path,
+            "w",
+            encoding="utf-8"
+        ) as f:
             f.write(summary)
 
-        job.output_file_key = str(output_path)
+        cloudinary_url = upload_file(
+            str(output_path)
+        )
+
+        job.output_file_key = (
+            cloudinary_url
+        )
+
         job.status = "completed"
-        job.completed_at = datetime.now(UTC)
+        job.completed_at = datetime.now(
+            UTC
+        )
 
         db.commit()
 
     except Exception as e:
+
+        print(
+            f"AI Summary Job {job_id} Failed: {e}"
+        )
 
         if job:
             job.status = "failed"
@@ -105,4 +143,5 @@ def ai_summarise_task(job_id: int):
             db.commit()
 
     finally:
+
         db.close()

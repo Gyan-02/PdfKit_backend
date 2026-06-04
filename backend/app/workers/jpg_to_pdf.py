@@ -5,8 +5,17 @@ from datetime import datetime, UTC
 
 from app.core.celery_app import celery_app
 from app.db.session import SessionLocal
+
 from app.models.job import Job
 from app.models.file import File
+
+from app.services.file_downloader import (
+    download_file
+)
+
+from app.services.cloudinary_storage import (
+    upload_file
+)
 
 
 @celery_app.task
@@ -41,9 +50,17 @@ def jpg_to_pdf_task(job_id: int):
 
         for db_file in files:
 
-            image_path = db_file.s3_key
+            image_path = download_file(
+                db_file.s3_key
+            )
 
-            img_doc = fitz.open(image_path)
+            print(
+                f"downloaded={image_path}"
+            )
+
+            img_doc = fitz.open(
+                image_path
+            )
 
             rect = img_doc[0].rect
 
@@ -60,7 +77,9 @@ def jpg_to_pdf_task(job_id: int):
             img_doc.close()
 
         output_dir = Path("outputs")
-        output_dir.mkdir(exist_ok=True)
+        output_dir.mkdir(
+            exist_ok=True
+        )
 
         output_path = (
             output_dir /
@@ -70,13 +89,26 @@ def jpg_to_pdf_task(job_id: int):
         pdf.save(str(output_path))
         pdf.close()
 
-        job.output_file_key = str(output_path)
+        cloudinary_url = upload_file(
+            str(output_path)
+        )
+
+        job.output_file_key = (
+            cloudinary_url
+        )
+
         job.status = "completed"
-        job.completed_at = datetime.now(UTC)
+        job.completed_at = datetime.now(
+            UTC
+        )
 
         db.commit()
 
     except Exception as e:
+
+        print(
+            f"JPG to PDF Job {job_id} Failed: {e}"
+        )
 
         if job:
             job.status = "failed"
@@ -84,4 +116,5 @@ def jpg_to_pdf_task(job_id: int):
             db.commit()
 
     finally:
+
         db.close()

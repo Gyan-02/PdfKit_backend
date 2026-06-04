@@ -9,7 +9,7 @@ from app.schemas.job_schema import (
 )
 from app.workers.test_worker import test_task
 
-from fastapi.responses import FileResponse
+from fastapi.responses import ( FileResponse , RedirectResponse)
 
 router = APIRouter(
     prefix="/jobs",
@@ -109,11 +109,12 @@ def download_job_output(
 
     if not job.output_file_key:
         return {"message": "Output not ready"}
-    
-    file_path = Path(job.output_file_key)
+
+    if job.output_file_key.startswith("http"):
+        return RedirectResponse(
+            url=job.output_file_key
+        )
 
     return FileResponse(
-        path=str(file_path),
-        filename=file_path.name,
-        
+        path=job.output_file_key
     )

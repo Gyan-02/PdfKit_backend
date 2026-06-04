@@ -13,6 +13,14 @@ from app.db.session import SessionLocal
 from app.models.job import Job
 from app.models.file import File
 
+from app.services.file_downloader import (
+    download_file
+)
+
+from app.services.cloudinary_storage import (
+    upload_file
+)
+
 
 @celery_app.task
 def ai_translate_task(job_id: int):
@@ -32,7 +40,9 @@ def ai_translate_task(job_id: int):
             return
 
         file_id = job.options["file_id"]
-        target_language = job.options["target_language"]
+        target_language = job.options[
+            "target_language"
+        ]
 
         job.status = "processing"
         db.commit()
@@ -44,9 +54,15 @@ def ai_translate_task(job_id: int):
         )
 
         if not db_file:
-            raise Exception("File not found")
+            raise Exception(
+                "File not found"
+            )
 
-        doc = fitz.open(db_file.s3_key)
+        input_path = download_file(
+            db_file.s3_key
+        )
+
+        doc = fitz.open(input_path)
 
         text = ""
 
@@ -61,22 +77,24 @@ def ai_translate_task(job_id: int):
             api_key=settings.GROQ_API_KEY
         )
 
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        f"Translate the following text "
-                        f"to {target_language}. "
-                        f"Return only the translation."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": text
-                }
-            ]
+        response = (
+            client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            f"Translate the following text "
+                            f"to {target_language}. "
+                            f"Return only the translation."
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": text
+                    }
+                ]
+            )
         )
 
         translated_text = (
@@ -104,13 +122,26 @@ def ai_translate_task(job_id: int):
         ) as f:
             f.write(translated_text)
 
-        job.output_file_key = str(output_path)
+        cloudinary_url = upload_file(
+            str(output_path)
+        )
+
+        job.output_file_key = (
+            cloudinary_url
+        )
+
         job.status = "completed"
-        job.completed_at = datetime.now(UTC)
+        job.completed_at = datetime.now(
+            UTC
+        )
 
         db.commit()
 
     except Exception as e:
+
+        print(
+            f"AI Translate Job {job_id} Failed: {e}"
+        )
 
         if job:
             job.status = "failed"
@@ -118,4 +149,5 @@ def ai_translate_task(job_id: int):
             db.commit()
 
     finally:
+
         db.close()
