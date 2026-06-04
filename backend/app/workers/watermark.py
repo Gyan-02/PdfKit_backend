@@ -5,8 +5,17 @@ from datetime import datetime, UTC
 
 from app.core.celery_app import celery_app
 from app.db.session import SessionLocal
+
 from app.models.job import Job
 from app.models.file import File
+
+from app.services.file_downloader import (
+    download_file
+)
+
+from app.services.cloudinary_storage import (
+    upload_file
+)
 
 
 @celery_app.task
@@ -27,7 +36,10 @@ def watermark_pdf_task(job_id: int):
             return
 
         file_id = job.options["file_id"]
-        watermark_text = job.options.get("text", "CONFIDENTIAL")
+        watermark_text = job.options.get(
+            "text",
+            "CONFIDENTIAL"
+        )
 
         job.status = "processing"
         db.commit()
@@ -39,26 +51,39 @@ def watermark_pdf_task(job_id: int):
         )
 
         if not db_file:
-            raise Exception("File not found")
+            raise Exception(
+                "File not found"
+            )
 
-        doc = fitz.open(db_file.s3_key)
+        input_path = download_file(
+            db_file.s3_key
+        )
+
+        print(
+            f"downloaded={input_path}"
+        )
+
+        doc = fitz.open(input_path)
 
         for page in doc:
 
             rect = page.rect
 
             page.insert_text(
-            (
-                rect.width * 0.25,
-                rect.height * 0.55
-            ),
-            watermark_text,
-            fontsize=70,
-            color=(0.75, 0.75, 0.75)
-        )
+                (
+                    rect.width * 0.25,
+                    rect.height * 0.55
+                ),
+                watermark_text,
+                fontsize=70,
+                color=(0.75, 0.75, 0.75)
+            )
 
         output_dir = Path("outputs")
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir.mkdir(
+            parents=True,
+            exist_ok=True
+        )
 
         output_path = (
             output_dir /
@@ -68,13 +93,26 @@ def watermark_pdf_task(job_id: int):
         doc.save(str(output_path))
         doc.close()
 
-        job.output_file_key = str(output_path)
+        cloudinary_url = upload_file(
+            str(output_path)
+        )
+
+        job.output_file_key = (
+            cloudinary_url
+        )
+
         job.status = "completed"
-        job.completed_at = datetime.now(UTC)
+        job.completed_at = datetime.now(
+            UTC
+        )
 
         db.commit()
 
     except Exception as e:
+
+        print(
+            f"Watermark Job {job_id} Failed: {e}"
+        )
 
         if job:
             job.status = "failed"
@@ -82,4 +120,5 @@ def watermark_pdf_task(job_id: int):
             db.commit()
 
     finally:
+
         db.close()
