@@ -1,10 +1,13 @@
 import fitz
-import qrcode
+import pytesseract
 
 from pathlib import Path
 from datetime import datetime, UTC
 
+from pdf2image import convert_from_path
+
 from app.core.celery_app import celery_app
+
 from app.db.session import SessionLocal
 
 from app.models.job import Job
@@ -17,10 +20,15 @@ from app.services.file_downloader import (
 from app.services.cloudinary_storage import (
     upload_file
 )
+from app.core.config import settings
+
+pytesseract.pytesseract.tesseract_cmd = (
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+)
 
 
 @celery_app.task
-def qr_pdf_task(job_id: int):
+def ocr_task(job_id: int):
 
     db = SessionLocal()
     job = None
@@ -37,7 +45,7 @@ def qr_pdf_task(job_id: int):
             return
 
         file_id = job.options["file_id"]
-        qr_text = job.options["url"]
+        language = job.options["language"]
 
         job.status = "processing"
         db.commit()
@@ -49,49 +57,53 @@ def qr_pdf_task(job_id: int):
         )
 
         if not db_file:
-            raise Exception("File not found")
+            raise Exception(
+                "File not found"
+            )
 
         input_path = download_file(
             db_file.s3_key
         )
 
+        images = convert_from_path(
+            input_path,
+            poppler_path=settings.POPPLER_PATH
+        )
+
+        extracted_text = ""
+
+        for image in images:
+
+            text = pytesseract.image_to_string(
+                image,
+                lang=language
+            )
+
+            extracted_text += text
+            extracted_text += "\n\n"
+
         output_dir = Path("outputs")
+
         output_dir.mkdir(
             parents=True,
             exist_ok=True
         )
 
-        qr_path = (
-            output_dir /
-            f"qr_{job_id}.png"
-        )
-
-        qr = qrcode.make(qr_text)
-        qr.save(qr_path)
-
-        doc = fitz.open(input_path)
-
-        for page in doc:
-
-            rect = fitz.Rect(
-                20,
-                20,
-                120,
-                120
-            )
-
-            page.insert_image(
-                rect,
-                filename=str(qr_path)
-            )
-
         output_path = (
-            output_dir /
-            f"qr_pdf_{job_id}.pdf"
+            output_dir
+            /
+            f"ocr_{job_id}.txt"
         )
 
-        doc.save(str(output_path))
-        doc.close()
+        with open(
+            output_path,
+            "w",
+            encoding="utf-8"
+        ) as f:
+
+            f.write(
+                extracted_text
+            )
 
         cloudinary_url = upload_file(
             str(output_path)
@@ -102,8 +114,9 @@ def qr_pdf_task(job_id: int):
         )
 
         job.status = "completed"
-        job.completed_at = datetime.now(
-            UTC
+
+        job.completed_at = (
+            datetime.now(UTC)
         )
 
         db.commit()
@@ -111,12 +124,17 @@ def qr_pdf_task(job_id: int):
     except Exception as e:
 
         print(
-            f"QR PDF Job {job_id} Failed: {e}"
+            f"OCR Job {job_id} Failed: {e}"
         )
 
         if job:
+
             job.status = "failed"
-            job.error_message = str(e)
+
+            job.error_message = (
+                str(e)
+            )
+
             db.commit()
 
     finally:

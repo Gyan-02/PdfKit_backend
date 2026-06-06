@@ -12,7 +12,7 @@ from app.models.user import User
 
 
 
-pwd_context = CryptContext(
+pwd_context = CryptContext( 
     schemes=["bcrypt"],
     deprecated="auto"
 )

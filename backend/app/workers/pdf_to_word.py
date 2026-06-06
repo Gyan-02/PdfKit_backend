@@ -1,10 +1,10 @@
-import fitz
-import qrcode
+from pdf2docx import Converter
 
 from pathlib import Path
 from datetime import datetime, UTC
 
 from app.core.celery_app import celery_app
+
 from app.db.session import SessionLocal
 
 from app.models.job import Job
@@ -20,7 +20,7 @@ from app.services.cloudinary_storage import (
 
 
 @celery_app.task
-def qr_pdf_task(job_id: int):
+def pdf_to_word_task(job_id: int):
 
     db = SessionLocal()
     job = None
@@ -37,7 +37,6 @@ def qr_pdf_task(job_id: int):
             return
 
         file_id = job.options["file_id"]
-        qr_text = job.options["url"]
 
         job.status = "processing"
         db.commit()
@@ -49,49 +48,37 @@ def qr_pdf_task(job_id: int):
         )
 
         if not db_file:
-            raise Exception("File not found")
+            raise Exception(
+                "File not found"
+            )
 
         input_path = download_file(
             db_file.s3_key
         )
 
-        output_dir = Path("outputs")
+        output_dir = Path(
+            "outputs"
+        )
+
         output_dir.mkdir(
             parents=True,
             exist_ok=True
         )
 
-        qr_path = (
-            output_dir /
-            f"qr_{job_id}.png"
-        )
-
-        qr = qrcode.make(qr_text)
-        qr.save(qr_path)
-
-        doc = fitz.open(input_path)
-
-        for page in doc:
-
-            rect = fitz.Rect(
-                20,
-                20,
-                120,
-                120
-            )
-
-            page.insert_image(
-                rect,
-                filename=str(qr_path)
-            )
-
         output_path = (
             output_dir /
-            f"qr_pdf_{job_id}.pdf"
+            f"pdf_to_word_{job_id}.docx"
         )
 
-        doc.save(str(output_path))
-        doc.close()
+        converter = Converter(
+            input_path
+        )
+
+        converter.convert(
+            str(output_path)
+        )
+
+        converter.close()
 
         cloudinary_url = upload_file(
             str(output_path)
@@ -102,8 +89,9 @@ def qr_pdf_task(job_id: int):
         )
 
         job.status = "completed"
-        job.completed_at = datetime.now(
-            UTC
+
+        job.completed_at = (
+            datetime.now(UTC)
         )
 
         db.commit()
@@ -111,12 +99,15 @@ def qr_pdf_task(job_id: int):
     except Exception as e:
 
         print(
-            f"QR PDF Job {job_id} Failed: {e}"
+            f"PDF To Word Job {job_id} Failed: {e}"
         )
 
         if job:
+
             job.status = "failed"
+
             job.error_message = str(e)
+
             db.commit()
 
     finally:
