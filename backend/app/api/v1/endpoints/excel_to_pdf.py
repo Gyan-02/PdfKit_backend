@@ -4,27 +4,25 @@ from sqlalchemy.orm import Session
 from app.db.dependencies import get_db
 from app.core.security import get_current_user
 from app.models.user import User
-from app.models.job import Job
 from app.models.file import File
+from app.models.job import Job
 
-from app.schemas.ai_summarise_schema import (
-    AISummariseRequest
+from app.schemas.excel_to_pdf_schema import (
+    ExcelToPdfRequest
 )
 
-from app.workers.ai_summarise import (
-    ai_summarise_task
+from app.workers.excel_to_pdf import (
+    excel_to_pdf_task
 )
-
 
 router = APIRouter(
-    prefix="/ai-summarise",
-    tags=["AI Summarise"]
+    prefix="/tools",
+    tags=["Excel To PDF"]
 )
 
-
-@router.post("/")
-def ai_summarise(
-    payload: AISummariseRequest,
+@router.post("/excel-to-pdf")
+def excel_to_pdf(
+    payload: ExcelToPdfRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -45,7 +43,7 @@ def ai_summarise(
         )
 
     db_job = Job(
-        tool_name="ai_summarise",
+        tool_name="excel_to_pdf",
         status="queued",
         options={
             "file_id": payload.file_id
@@ -57,7 +55,7 @@ def ai_summarise(
     db.commit()
     db.refresh(db_job)
 
-    ai_summarise_task.delay(
+    excel_to_pdf_task.delay(
         db_job.id
     )
 

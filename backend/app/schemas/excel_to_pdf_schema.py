@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 
-
-class QRPdfRequest(BaseModel):
+class ExcelToPdfRequest(BaseModel):
     file_id: int
-    url: str
+    

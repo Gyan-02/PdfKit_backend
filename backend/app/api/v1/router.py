@@ -39,6 +39,30 @@ from app.api.v1.endpoints.qr_pdf import (
 from app.api.v1.endpoints.admin import (
     router as admin_router
 )
+from app.api.v1.endpoints.organize import (
+    router as organize_router
+)
+from app.api.v1.endpoints.ocr import (router as ocr_router)
+
+from app.api.v1.endpoints.pdf_to_word import (router as pdf_to_word_router)
+from app.api.v1.endpoints.word_to_pdf import (router as word_to_pdf_router)
+from app.api.v1.endpoints.sign_pdf import (router as sign_pdf_router)
+from app.api.v1.endpoints.excel_to_pdf import (
+    router as excel_to_pdf_router
+)
+from app.api.v1.endpoints.ppt_to_pdf import (
+    router as ppt_to_pdf_router )
+
+from app.api.v1.endpoints.pdf_to_excel import (
+    router as pdf_to_excel_router
+)
+from app.api.v1.endpoints.qr_generator import (
+    router as qr_generator_router  )
+
+
+
+
+
 
 
 router = APIRouter(
@@ -74,3 +98,12 @@ router.include_router(
 router.include_router(
     admin_router
 )
+router.include_router(organize_router)
+router.include_router(ocr_router)
+router.include_router(pdf_to_word_router)
+router.include_router(word_to_pdf_router)
+router.include_router(sign_pdf_router)
+router.include_router(excel_to_pdf_router)
+router.include_router(ppt_to_pdf_router)
+router.include_router(pdf_to_excel_router)
+router.include_router(qr_generator_router)

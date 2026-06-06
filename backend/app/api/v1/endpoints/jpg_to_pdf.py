@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.dependencies import get_db
-
+from app.core.security import get_current_user
+from app.models.user import User
 from app.models.job import Job
 from app.models.file import File
 
@@ -24,26 +25,32 @@ router = APIRouter(
 @router.post("/")
 def jpg_to_pdf(
     payload: JpgToPdfRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
 
     files = (
         db.query(File)
-        .filter(File.id.in_(payload.file_ids))
+        .filter(
+            File.id.in_(payload.file_ids),
+            File.user_id == current_user.id
+        )
         .all()
     )
 
     if len(files) != len(payload.file_ids):
-        return {
-            "message": "One or more files not found"
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="One or more files not found"
+        )
 
     db_job = Job(
         tool_name="jpg_to_pdf",
         status="queued",
         options={
             "file_ids": payload.file_ids
-        }
+        },
+        user_id=current_user.id
     )
 
     db.add(db_job)

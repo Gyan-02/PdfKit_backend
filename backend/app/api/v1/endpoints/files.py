@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, Depends
+from fastapi import APIRouter, UploadFile, Depends, HTTPException
 from pathlib import Path
 from sqlalchemy.orm import Session
 
@@ -23,7 +23,7 @@ router = APIRouter(
 async def upload_file(
     file: UploadFile,
     db: Session = Depends(get_db),
-    # current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
 
     file_path = UPLOAD_DIR / file.filename
@@ -38,7 +38,7 @@ async def upload_file(
     )
 
     db_file = File(
-        # user_id=current_user.id,
+        user_id=current_user.id,
         original_filename=file.filename,
         s3_key=cloudinary_url,
         size_bytes=len(content),
@@ -59,19 +59,24 @@ async def upload_file(
 @router.get("/{file_id}")
 def get_file(
     file_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
 
     db_file = (
         db.query(File)
-        .filter(File.id == file_id)
+        .filter(
+            File.id == file_id,
+            File.user_id == current_user.id
+        )
         .first()
     )
 
     if not db_file:
-        return {
-            "message": "File not found"
-        }
+        raise HTTPException(
+            status_code=404,
+            detail="File not found"
+        )
 
     return {
         "file_id": db_file.id,

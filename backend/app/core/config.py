@@ -14,7 +14,9 @@ class Settings(BaseSettings):
 
     CLOUDINARY_CLOUD_NAME: str
     CLOUDINARY_API_KEY: str
-    CLOUDINARY_API_SECRET: str
+    CLOUDINARY_API_SECRET: str 
+    POPPLER_PATH: str
+    GHOSTSCRIPT_PATH: str
 
     class Config:
         env_file = ".env"

@@ -1,9 +1,12 @@
 import fitz
+import subprocess
 
 from pathlib import Path
 from datetime import datetime, UTC
 
+from app.core.config import settings
 from app.core.celery_app import celery_app
+
 from app.db.session import SessionLocal
 
 from app.models.job import Job
@@ -19,7 +22,7 @@ from app.services.cloudinary_storage import (
 
 
 @celery_app.task
-def compress_pdf_task(job_id: int):
+def compress_task(job_id: int):
 
     db = SessionLocal()
     job = None
@@ -35,9 +38,18 @@ def compress_pdf_task(job_id: int):
         if not job:
             return
 
-        file_id = job.options["file_id"]
+        file_id = (
+            job.options["file_id"]
+        )
+
+        compression_percent = (
+            job.options[
+                "compression_percent"
+            ]
+        )
 
         job.status = "processing"
+
         db.commit()
 
         db_file = (
@@ -47,31 +59,43 @@ def compress_pdf_task(job_id: int):
         )
 
         if not db_file:
-            raise Exception("File not found")
+            raise Exception(
+                "File not found"
+            )
 
         input_path = download_file(
             db_file.s3_key
         )
 
-        print(
-            f"downloaded={input_path}"
+        output_dir = Path(
+            "outputs"
         )
 
-        doc = fitz.open(input_path)
-
-        output_dir = Path("outputs")
         output_dir.mkdir(
             parents=True,
             exist_ok=True
         )
 
-        output_path = (
-            output_dir /
+        clean_pdf = (
+            output_dir
+            /
+            f"clean_{job_id}.pdf"
+        )
+
+        final_pdf = (
+            output_dir
+            /
             f"compressed_{job_id}.pdf"
         )
 
+    
+
+        doc = fitz.open(
+            input_path
+        )
+
         doc.save(
-            str(output_path),
+            str(clean_pdf),
             garbage=4,
             deflate=True,
             clean=True
@@ -79,17 +103,66 @@ def compress_pdf_task(job_id: int):
 
         doc.close()
 
-        cloudinary_url = upload_file(
-            str(output_path)
+        
+
+        if compression_percent <= 25:
+
+            pdf_setting = (
+                "/prepress"
+            )
+
+        elif compression_percent <= 60:
+
+            pdf_setting = (
+                "/ebook"
+            )
+
+        else:
+
+            pdf_setting = (
+                "/screen"
+            )
+
+
+        subprocess.run(
+            [
+                settings.GHOSTSCRIPT_PATH,
+
+                "-sDEVICE=pdfwrite",
+
+                "-dCompatibilityLevel=1.4",
+
+                f"-dPDFSETTINGS={pdf_setting}",
+
+                "-dNOPAUSE",
+
+                "-dQUIET",
+
+                "-dBATCH",
+
+                f"-sOutputFile={final_pdf}",
+
+                str(clean_pdf)
+            ],
+            check=True
+        )
+
+        cloudinary_url = (
+            upload_file(
+                str(final_pdf)
+            )
         )
 
         job.output_file_key = (
             cloudinary_url
         )
 
-        job.status = "completed"
-        job.completed_at = datetime.now(
-            UTC
+        job.status = (
+            "completed"
+        )
+
+        job.completed_at = (
+            datetime.now(UTC)
         )
 
         db.commit()
@@ -101,8 +174,13 @@ def compress_pdf_task(job_id: int):
         )
 
         if job:
+
             job.status = "failed"
-            job.error_message = str(e)
+
+            job.error_message = (
+                str(e)
+            )
+
             db.commit()
 
     finally:

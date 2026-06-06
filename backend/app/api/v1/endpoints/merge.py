@@ -7,6 +7,8 @@ from app.models.job import Job
 from app.workers.merge import merge_pdf_task
 from app.schemas.merge_schema import MergeRequest
 from app.models.file import File
+from app.core.security import get_current_user
+from app.models.user import User
 
 router = APIRouter(
     prefix="/merge",
@@ -16,12 +18,15 @@ router = APIRouter(
 @router.post("/")
 def merge_pdf(
     payload: MergeRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
      
     files = (
         db.query(File)
-        .filter(File.id.in_(payload.file_ids))
+        .filter(File.id.in_(payload.file_ids),
+                File.user_id == current_user.id
+                )
         .all()
     )
 
@@ -36,7 +41,8 @@ def merge_pdf(
         status="queued",
         options={
             "file_ids": payload.file_ids
-        }
+        },
+        user_id=current_user.id
     )
 
     db.add(db_job)
