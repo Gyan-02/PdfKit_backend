@@ -658,20 +658,22 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
   useEffect(() => {
     if (preloadedRef.current) return;
     const fileIdParam = searchParams.get("file_id");
-    if (!fileIdParam || files.length > 0) return;
+    if (!fileIdParam) return;
     const fileId = parseInt(fileIdParam, 10);
     if (isNaN(fileId)) return;
 
     preloadedRef.current = true;
     const mockFile = new File([], "uploaded-file");
-    setFiles([{
-      file: mockFile,
-      id: `preloaded-${fileId}`,
-      name: "Uploaded file",
-      size: "-",
-      pages: "-",
-      preloadedFileId: fileId,
-    }]);
+    setTimeout(() => {
+      setFiles([{
+        file: mockFile,
+        id: `preloaded-${fileId}`,
+        name: "Uploaded file",
+        size: "-",
+        pages: "-",
+        preloadedFileId: fileId,
+      }]);
+    }, 0);
   }, [searchParams]);
   // ──────────────────────────────────────────────────────────
 
