@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     CLOUDINARY_API_SECRET: str 
     POPPLER_PATH: str
     GHOSTSCRIPT_PATH: str
+    GOOGLE_CLIENT_ID: str
+    
 
     class Config:
         env_file = ".env"
