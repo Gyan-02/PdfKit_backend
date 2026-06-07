@@ -528,6 +528,7 @@ body {
 .step-circle.active { border-color: var(--text); }
 .step-circle.active::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--text); animation: pulse 1s infinite; display: block; }
 @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(0.7);opacity:0.5} }
+@keyframes spin { to { transform: rotate(360deg); } }
 .step-text { font-size: 13px; color: var(--muted); }
 .step-text.done { color: var(--text); font-weight: 500; }
 .step-text.active { color: var(--text); font-weight: 500; }

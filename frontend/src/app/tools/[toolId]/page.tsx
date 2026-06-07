@@ -7,11 +7,9 @@ import {
   pptToPdf, signPdf, aiTranslate, aiRewrite, qrToPdf,
 } from "@/lib/pdfApi";
 import { useState, useRef, useCallback, use, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { tools } from "@/lib/data";
-import { analyzeFile, DetectedFile } from "@/lib/fileDetect";
-import SmartFileBanner from "@/components/SmartFileBanner";
 import { useAuth } from "@/lib/AuthContext";
 
 function SvgIcon({ d, size = 16, stroke = "currentColor", strokeWidth = 1.6 }: {
@@ -55,7 +53,7 @@ interface ToolState {
 }
 interface FileEntry {
   file: File; id: string; name: string; size: string; pages?: string;
-  detected?: DetectedFile;
+  preloadedFileId?: number;
 }
 
 interface ToolConfig {
@@ -620,6 +618,7 @@ const CFGS: Record<string, ToolConfig> = {
 
 export default function ToolPage({ params }: { params: Promise<{ toolId: string }> }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toolId } = use(params);
   const cfg = CFGS[toolId];
   const tool = tools.find((t) => t.id === toolId);
@@ -635,8 +634,6 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
   // ────────────────────────────────────────────────────────────
 
   const [files, setFiles] = useState<FileEntry[]>([]);
-  const [detectedInfo, setDetectedInfo] = useState<{ detected: DetectedFile; name: string } | null>(null);
-  const [showBanner, setShowBanner] = useState(false);
 
   const [state, setState] = useState<ToolState>({
     // rotation is a number (270 = left 90°, 90 = right 90°, 180 = 180°)
@@ -656,6 +653,28 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
   const [downloadUrl, setDownloadUrl] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
+  // ── Pre-load file from ?file_id= query param ─────────────────
+  useEffect(() => {
+    const fileIdParam = searchParams.get("file_id");
+    if (!fileIdParam || files.length > 0) return;
+    const fileId = parseInt(fileIdParam, 10);
+    if (isNaN(fileId)) return;
+
+    // File was already uploaded (e.g. from home page). Construct a
+    // minimal FileEntry so we can process without re-uploading.
+    const mockFile = new File([], "uploaded-file");
+    setFiles([{
+      file: mockFile,
+      id: `preloaded-${fileId}`,
+      name: "Uploaded file",
+      size: "—",
+      pages: "—",
+      preloadedFileId: fileId,
+    }]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+  // ────────────────────────────────────────────────────────────
+
   // Cleanup object URLs to prevent memory leaks
   useEffect(() => {
     return () => {
@@ -673,14 +692,7 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
       name: f.name,
       size: (f.size / 1024 / 1024).toFixed(1) + " MB",
       pages: `${Math.floor(Math.random() * 20) + 1} pages`,
-      detected: analyzeFile(f),
     }));
-
-    if (arr.length > 0) {
-      const first = arr[0];
-      setDetectedInfo({ detected: first.detected!, name: first.name });
-      setShowBanner(true);
-    }
 
     setFiles((p) => (cfg?.multi ? [...p, ...arr] : arr.slice(0, 1)));
   }, [cfg?.multi]);
@@ -712,8 +724,22 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
         }, 1200);
         return;
       } else {
-        const uploadedFiles = await Promise.all(files.map((f) => uploadFile(f.file)));
-        const fileIds = uploadedFiles.map((f) => f.file_id);
+        // For pre-loaded files, skip re-upload and use existing file_id directly
+        let fileIds: number[];
+        if (files.length === 1 && files[0].preloadedFileId !== undefined) {
+          fileIds = [files[0].preloadedFileId];
+        } else if (files.every((f) => f.preloadedFileId !== undefined)) {
+          fileIds = files.map((f) => f.preloadedFileId as number);
+        } else {
+          const uploadedFiles = await Promise.all(
+            files.map((f) =>
+              f.preloadedFileId !== undefined
+                ? Promise.resolve({ file_id: f.preloadedFileId })
+                : uploadFile(f.file)
+            )
+          );
+          fileIds = uploadedFiles.map((f) => f.file_id);
+        }
 
         setCurStep(2); // Processing
 
@@ -884,15 +910,6 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
         {pState === "idle" && (
           <div className="tool-layout">
             <div>
-              {/* ── Smart Detection Banner ── */}
-              {showBanner && detectedInfo && (
-                <SmartFileBanner
-                  detected={detectedInfo.detected}
-                  fileName={detectedInfo.name}
-                  onDismiss={() => setShowBanner(false)}
-                />
-              )}
-
               {/* Upload zone — hidden for QR generator */}
               {toolId !== "qr" && (
               <div
@@ -1005,24 +1022,21 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
                           <div className="file-row-name">{f.name}</div>
                           <div className="file-row-meta">
                             {f.size} · {f.pages}
-                            {f.detected && (
+                            {f.preloadedFileId !== undefined && (
                               <span style={{
                                 marginLeft: 8, padding: "1px 7px", borderRadius: 99,
                                 fontSize: 10, fontWeight: 700, background: "var(--bg-3)",
-                                color: "var(--muted)", border: "1px solid var(--border)",
+                                color: "var(--accent-2)", border: "1px solid var(--border)",
                                 verticalAlign: "middle",
                               }}>
-                                {f.detected.ext}
+                                pre-loaded
                               </span>
                             )}
                           </div>
                         </div>
                         <button suppressHydrationWarning
                           className="file-row-remove"
-                          onClick={() => {
-                            setFiles((p) => p.filter((x) => x.id !== f.id));
-                            if (files.length === 1) setShowBanner(false);
-                          }}
+                          onClick={() => setFiles((p) => p.filter((x) => x.id !== f.id))}
                         >
                           <SvgIcon d="M18 6L6 18M6 6l12 12" size={13} />
                         </button>
@@ -1131,7 +1145,7 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
                 <SvgIcon d={["M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4","M7 10l5 5 5-5","M12 15V3"]} size={15} />
                 Download
               </button>
-              <button suppressHydrationWarning className="btn btn-outline btn-lg" onClick={() => { setFiles([]); setPState("idle"); setProgress(0); setShowBanner(false); setDetectedInfo(null); setErrorMsg(""); }}>
+              <button suppressHydrationWarning className="btn btn-outline btn-lg" onClick={() => { setFiles([]); setPState("idle"); setProgress(0); setErrorMsg(""); }}>
                 Process Another
               </button>
             </div>
