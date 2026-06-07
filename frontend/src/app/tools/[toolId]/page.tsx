@@ -652,28 +652,28 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
   const [isDrag, setIsDrag] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
+  const preloadedRef = useRef(false);
 
-  // ── Pre-load file from ?file_id= query param ─────────────────
+  // ── Pre-load file from ?file_id= query param (e.g. after home-page upload) ──
   useEffect(() => {
+    if (preloadedRef.current) return;
     const fileIdParam = searchParams.get("file_id");
     if (!fileIdParam || files.length > 0) return;
     const fileId = parseInt(fileIdParam, 10);
     if (isNaN(fileId)) return;
 
-    // File was already uploaded (e.g. from home page). Construct a
-    // minimal FileEntry so we can process without re-uploading.
+    preloadedRef.current = true;
     const mockFile = new File([], "uploaded-file");
     setFiles([{
       file: mockFile,
       id: `preloaded-${fileId}`,
       name: "Uploaded file",
-      size: "—",
-      pages: "—",
+      size: "-",
+      pages: "-",
       preloadedFileId: fileId,
     }]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
-  // ────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────
 
   // Cleanup object URLs to prevent memory leaks
   useEffect(() => {
