@@ -95,11 +95,15 @@ export default function AdminPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [activeTab, setActiveTab] = useState<"stats" | "users" | "jobs" | "files">("stats");
   const [dataLoading, setDataLoading] = useState(true);
+  const [showUnauthorised, setShowUnauthorised] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated) { router.push("/signin"); return; }
-    if (user?.plan_type !== "admin") { router.push("/"); return; }
+    if (user?.plan_type !== "admin") {
+      setShowUnauthorised(true);
+      return;
+    }
 
     const fetchAll = async () => {
       try {
@@ -122,6 +126,79 @@ export default function AdminPage() {
 
     fetchAll();
   }, [isLoading, isAuthenticated, user, router]);
+
+  /* ── "You are not authorised" popup for non-admin users ── */
+  if (showUnauthorised) {
+    return (
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)",
+      }}>
+        <div style={{
+          background: "var(--bg-2, #1a1a2e)", border: "1px solid var(--border, #333)",
+          borderRadius: 16, padding: "40px 36px", maxWidth: 400, width: "90%",
+          textAlign: "center", boxShadow: "0 24px 64px rgba(0,0,0,0.4)",
+          animation: "popIn 0.3s cubic-bezier(0.16,1,0.3,1)",
+        }}>
+          {/* Shield icon */}
+          <div style={{
+            width: 64, height: 64, margin: "0 auto 20px", borderRadius: "50%",
+            background: "rgba(217, 79, 79, 0.12)", display: "flex",
+            alignItems: "center", justifyContent: "center",
+          }}>
+            <svg width={32} height={32} viewBox="0 0 24 24" fill="none" stroke="#D94F4F" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+              <line x1={12} y1={8} x2={12} y2={12} />
+              <line x1={12} y1={16} x2={12.01} y2={16} />
+            </svg>
+          </div>
+          <h2 style={{
+            fontSize: 20, fontWeight: 700, color: "var(--text, #fff)",
+            margin: "0 0 8px", fontFamily: "var(--font-sans, system-ui)",
+          }}>
+            Access Denied
+          </h2>
+          <p style={{
+            fontSize: 14, color: "var(--muted, #888)", lineHeight: 1.5,
+            margin: "0 0 28px", fontFamily: "var(--font-sans, system-ui)",
+          }}>
+            You are not authorised to view this page.<br />
+            Only administrators can access the Admin Dashboard.
+          </p>
+          <button
+            onClick={() => router.push("/")}
+            style={{
+              padding: "12px 32px", borderRadius: 10, border: "none",
+              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer",
+              fontFamily: "var(--font-sans, system-ui)",
+              transition: "transform 0.15s, box-shadow 0.15s",
+              boxShadow: "0 4px 16px rgba(99,102,241,0.3)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-1px)";
+              e.currentTarget.style.boxShadow = "0 6px 24px rgba(99,102,241,0.45)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "0 4px 16px rgba(99,102,241,0.3)";
+            }}
+          >
+            Go to Home
+          </button>
+        </div>
+
+        {/* Pop-in animation */}
+        <style>{`
+          @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.85) translateY(20px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   if (isLoading || dataLoading) {
     return (
