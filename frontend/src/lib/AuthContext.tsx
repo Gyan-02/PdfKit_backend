@@ -64,13 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loginWithGoogle = useCallback(async (googleAccessToken: string) => {
-  console.log("1. Google token received:", googleAccessToken);
+  console.log("1. Google token received:");
   const res = await googleLoginUser(googleAccessToken);
-  console.log("2. Backend response:", res);
+  console.log("2. Backend response:");
   localStorage.setItem(TOKEN_KEY, res.access_token);
   setToken(res.access_token);
   const me = await getMe();
-  console.log("3. Me response:", me);
+  console.log("3. Me response:");
   setUser(me);
 }, []);
 
