@@ -11,7 +11,8 @@ import { useState, useRef, useCallback, use, useEffect, type Dispatch, type SetS
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { tools } from "@/lib/data";
-import { useAuth } from "@/lib/AuthContext";
+// import { useAuth } from "@/lib/AuthContext";
+
 
 function SvgIcon({ d, size = 16, stroke = "currentColor", strokeWidth = 1.6 }: {
   d: string | string[]; size?: number; stroke?: string; strokeWidth?: number;
@@ -67,6 +68,8 @@ interface ToolState {
   dpi?: number;
   upscaleScale?: number;
   upscaleModel?: string;
+  organizeMode?: string;
+  originalOrder?: boolean;
 }
 interface FileEntry {
   file: File; id: string; name: string; size: string; pages?: string;
@@ -86,10 +89,16 @@ const CFGS: Record<string, ToolConfig> = {
     title: "MERGE", desc: "Combine multiple PDF files into a single document.",
     multi: true, accept: ".pdf", acceptLabel: "PDF files", num: "02",
     howItWorks: [{ title: "Add PDFs", desc: "Select multiple PDFs." }, { title: "Arrange", desc: "Reorder as needed." }, { title: "Download", desc: "Get merged PDF." }],
-    options: (_s, _set) => (
+    options: (state, set) => (
       <div className="option-group">
-        <label className="checkbox-row" style={{ cursor: "pointer" }}>
-          <div className="checkbox-box checked"><SvgIcon d="M20 6L9 17l-5-5" size={9} strokeWidth={3} /></div>
+        <label
+          className="checkbox-row"
+          style={{ cursor: "pointer" }}
+          onClick={() => set((s) => ({ ...s, originalOrder: !s.originalOrder }))}
+        >
+          <div className={`checkbox-box${state.originalOrder !== false ? " checked" : ""}`}>
+            {state.originalOrder !== false && <SvgIcon d="M20 6L9 17l-5-5" size={9} strokeWidth={3} />}
+          </div>
           <span className="checkbox-label">Merge in the original order</span>
         </label>
       </div>
@@ -256,10 +265,18 @@ const CFGS: Record<string, ToolConfig> = {
     title: "ORGANIZE", desc: "Reorder, delete or add pages.",
     multi: false, accept: ".pdf", acceptLabel: "PDF file", num: "11",
     howItWorks: [{ title: "Upload", desc: "Select PDF." }, { title: "Organize", desc: "Reorder pages." }, { title: "Download", desc: "Organized PDF." }],
-    options: () => (
+    options: (state, set) => (
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {["Reorder Pages","Delete Pages","Add Blank Pages"].map((a) => (
-          <button suppressHydrationWarning key={a} className="btn btn-outline btn-sm" style={{ justifyContent: "center" }}>{a}</button>
+          <button
+            suppressHydrationWarning
+            key={a}
+            className={`btn btn-outline btn-sm${state.organizeMode === a ? " selected" : ""}`}
+            style={{ justifyContent: "center" }}
+            onClick={() => set((s) => ({ ...s, organizeMode: a }))}
+          >
+            {a}
+          </button>
         ))}
       </div>
     ),
@@ -752,6 +769,51 @@ Object.assign(
   )
 );
 
+// ── Sidebar Dropdown Component ────────────────────────────────────────────────
+function SidebarDropdown({ cat, catTools, currentToolId, defaultOpen }: {
+  cat: { id: string; label: string; icon: string | string[] };
+  catTools: { id: string; label: string; color: string; icon: string | string[] }[];
+  currentToolId: string;
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const isActive = catTools.some(t => t.id === currentToolId);
+
+  return (
+    <div className="sidebar-dropdown">
+      <button
+        suppressHydrationWarning
+        className={`sidebar-link sidebar-dropdown-trigger${isActive ? " active-parent" : ""}`}
+        onClick={() => setOpen(o => !o)}
+      >
+        <SvgIcon d={cat.icon} size={14} />
+        {cat.label}
+        <svg
+          className={`sidebar-chevron${open ? " open" : ""}`}
+          width={12} height={12} viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <div className="sidebar-dropdown-items">
+          {catTools.map(t => (
+            <Link
+              key={t.id}
+              href={`/tools/${t.id}`}
+              className={`sidebar-sub-link${t.id === currentToolId ? " active" : ""}`}
+            >
+              <span className="sidebar-sub-dot" style={{ background: t.color }} />
+              {t.label}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ToolPage({ params }: { params: Promise<{ toolId: string }> }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -759,14 +821,14 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
   const cfg = CFGS[toolId];
   const tool = tools.find((t) => t.id === toolId);
 
-  // ── Auth guard ──────────────────────────────────────────────
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
-
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push(`/signin?next=${encodeURIComponent(`/tools/${toolId}`)}`);
-    }
-  }, [authLoading, isAuthenticated, router, toolId]);
+  // ── Auth guard (commented out) ──────────────────────────────
+  // const { isAuthenticated, isLoading: authLoading } = useAuth();
+  //
+  // useEffect(() => {
+  //   if (!authLoading && !isAuthenticated) {
+  //     router.push(`/signin?next=${encodeURIComponent(`/tools/${toolId}`)}`);
+  //   }
+  // }, [authLoading, isAuthenticated, router, toolId]);
   // ────────────────────────────────────────────────────────────
 
   const [files, setFiles] = useState<FileEntry[]>([]);
@@ -780,6 +842,8 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
     translateLang: "Hindi", rewriteTone: "Professional",
     qrUrl: "", qrSize: "512×512", qrFormat: "PNG",
     qr2pdfUrl: "", qr2pdfPosition: "Bottom Right", qr2pdfSize: "Medium", qr2pdfPages: "All Pages",
+    organizeMode: "Reorder Pages",
+    originalOrder: true,
     textValue: "",
     imageQuality: 75,
     resizeWidth: 1024, resizeHeight: 1024,
@@ -795,6 +859,7 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
   const [progress, setProgress] = useState(0);
   const [curStep, setCurStep] = useState(0);
   const [isDrag, setIsDrag] = useState(false);
+  const [dragFileIdx, setDragFileIdx] = useState<number | null>(null);
   const [downloadUrl, setDownloadUrl] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const preloadedRef = useRef(false);
@@ -843,6 +908,16 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
 
     setFiles((p) => (cfg?.multi ? [...p, ...arr] : arr.slice(0, 1)));
   }, [cfg?.multi]);
+
+  const moveFile = useCallback((from: number, to: number) => {
+    if (from === to) return;
+    setFiles((prev) => {
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+  }, []);
 
   const startProcessing = async () => {
     if (!NO_UPLOAD_TOOL_IDS.has(toolId) && !files.length) return;
@@ -995,7 +1070,7 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
       let msg = "Something went wrong. Please try again.";
       if (axiosError?.response?.status === 401) {
         msg = "Session expired. Please sign in again.";
-        router.push(`/signin?next=${encodeURIComponent(`/tools/${toolId}`)}`);
+        // router.push(`/signin?next=${encodeURIComponent(`/tools/${toolId`)}`);
       } else if (axiosError?.response?.data?.detail) {
         msg = axiosError.response.data.detail;
       }
@@ -1004,26 +1079,26 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
     }
   };
 
-  // Show loading spinner while auth is being determined
-  if (authLoading) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{
-            width: 40, height: 40, border: "3px solid var(--border)",
-            borderTopColor: "var(--text)", borderRadius: "50%",
-            animation: "spin 0.8s linear infinite", margin: "0 auto 12px"
-          }} />
-          <div style={{ fontSize: 14, color: "var(--muted)" }}>Loading…</div>
-        </div>
-      </div>
-    );
-  }
-
-  // Don't render content while redirect is happening
-  if (!isAuthenticated) {
-    return null;
-  }
+  // // Show loading spinner while auth is being determined
+  // if (authLoading) {
+  //   return (
+  //     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+  //       <div style={{ textAlign: "center" }}>
+  //         <div style={{
+  //           width: 40, height: 40, border: "3px solid var(--border)",
+  //           borderTopColor: "var(--text)", borderRadius: "50%",
+  //           animation: "spin 0.8s linear infinite", margin: "0 auto 12px"
+  //         }} />
+  //         <div style={{ fontSize: 14, color: "var(--muted)" }}>Loading…</div>
+  //       </div>
+  //     </div>
+  //   );
+  // }
+  //
+  // // Don't render content while redirect is happening
+  // if (!isAuthenticated) {
+  //   return null;
+  // }
 
   if (!cfg || !tool) {
     return (
@@ -1051,23 +1126,41 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
     <div className="tool-page">
       {/* Sidebar */}
       <div className="tools-sidebar">
-        {sidebarCats.map((c) => (
-          <Link
-            key={c.id}
-            href={c.id === "all" ? "/" : `/tools/${tools.find(t => t.category === c.id)?.id || "merge"}`}
-            className="sidebar-link"
-          >
-            <SvgIcon d={c.icon} size={14} />{c.label}
-          </Link>
-        ))}
-        <div className="sidebar-download" style={{ marginTop: 24 }}>
-          <div className="sidebar-download-title">Work faster.</div>
-          <div className="sidebar-download-desc">Install our desktop app for offline productivity.</div>
-          <button suppressHydrationWarning className="btn btn-dark btn-sm" style={{ width: "100%", justifyContent: "center" }}>
-            <SvgIcon d={["M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4","M7 10l5 5 5-5","M12 15V3"]} size={12} />
-            Download App
-          </button>
-        </div>
+        {sidebarCats.map((c) => {
+          const catTools = c.id === "all" ? [] : tools.filter(t => t.category === c.id);
+          const isExpandable = catTools.length > 1;
+          const isActive = catTools.some(t => t.id === toolId);
+
+          if (c.id === "all") {
+            return (
+              <Link key={c.id} href="/" className="sidebar-link">
+                <SvgIcon d={c.icon} size={14} />{c.label}
+              </Link>
+            );
+          }
+
+          if (!isExpandable && catTools.length === 1) {
+            return (
+              <Link
+                key={c.id}
+                href={`/tools/${catTools[0].id}`}
+                className={`sidebar-link${catTools[0].id === toolId ? " active" : ""}`}
+              >
+                <SvgIcon d={c.icon} size={14} />{c.label}
+              </Link>
+            );
+          }
+
+          return (
+            <SidebarDropdown
+              key={c.id}
+              cat={c}
+              catTools={catTools}
+              currentToolId={toolId}
+              defaultOpen={isActive}
+            />
+          );
+        })}
       </div>
 
       {/* Main */}
@@ -1076,7 +1169,6 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
           <SvgIcon d="M19 12H5M12 19l-7-7 7-7" size={14} />Back
         </button>
 
-        <div className="tool-section-num">{cfg.num}</div>
         <h1 className="tool-title">{cfg.title}</h1>
         <p className="tool-desc">{cfg.desc}</p>
 
@@ -1221,10 +1313,23 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
                 <div style={{ marginTop: 20 }}>
                   <div className="files-panel-title">Files to {cfg.title.toLowerCase()} ({files.length})</div>
                   <div className="file-list">
-                    {files.map((f, i) => (
-                      <div key={f.id} className="file-row">
+                    {files.map((f, i) => {
+                      const canReorder = toolId === "merge" && state.originalOrder === false;
+                      return (
+                      <div
+                        key={f.id}
+                        className={`file-row${canReorder && dragFileIdx === i ? " dragging" : ""}`}
+                        draggable={canReorder}
+                        onDragStart={canReorder ? () => setDragFileIdx(i) : undefined}
+                        onDragOver={canReorder ? (e) => e.preventDefault() : undefined}
+                        onDrop={canReorder ? () => {
+                          if (dragFileIdx !== null) moveFile(dragFileIdx, i);
+                          setDragFileIdx(null);
+                        } : undefined}
+                        onDragEnd={canReorder ? () => setDragFileIdx(null) : undefined}
+                      >
                         <div className="file-row-num">{String(i + 1).padStart(2, "0")}</div>
-                        <div className="file-row-drag">
+                        <div className="file-row-drag" style={canReorder ? undefined : { cursor: "default", opacity: 0.35 }}>
                           <SvgIcon d={["M9 6h6","M9 12h6","M9 18h6","M5 6h.01","M5 12h.01","M5 18h.01"]} size={13} />
                         </div>
                         <div className="file-row-info">
@@ -1250,7 +1355,8 @@ export default function ToolPage({ params }: { params: Promise<{ toolId: string 
                           <SvgIcon d="M18 6L6 18M6 6l12 12" size={13} />
                         </button>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {cfg.multi && (

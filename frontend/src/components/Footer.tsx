@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { publicTools } from "@/lib/data";
+import { tools } from "@/lib/data";
 
 function FooterIcon({ d, size = 14 }: { d: string | string[]; size?: number }) {
   return (
@@ -21,21 +21,29 @@ export default function Footer() {
               <span className="footer-logo-name">PDFKIT</span>
             </div>
             <p className="footer-brand-desc">
-              Everything you need to edit, convert, protect and manage PDFs — in one clean workspace.
+              Everything you need to edit, convert, protect and manage PDFs in one clean workspace.
             </p>
           </div>
           <div className="footer-col">
             <h4>Tools</h4>
             <ul>
-              {publicTools.slice(0, 6).map((t) => (
+              {tools.slice(0, 8).map((t) => (
                 <li key={t.id}><Link href={`/tools/${t.id}`}>{t.label}</Link></li>
               ))}
             </ul>
           </div>
           <div className="footer-col">
-            <h4>More</h4>
+            <h4>More Tools</h4>
             <ul>
-              {publicTools.slice(6).map((t) => (
+              {tools.slice(8, 16).map((t) => (
+                <li key={t.id}><Link href={`/tools/${t.id}`}>{t.label}</Link></li>
+              ))}
+            </ul>
+          </div>
+          <div className="footer-col">
+            <h4>Utilities</h4>
+            <ul>
+              {tools.slice(16, 23).map((t) => (
                 <li key={t.id}><Link href={`/tools/${t.id}`}>{t.label}</Link></li>
               ))}
             </ul>
@@ -43,8 +51,13 @@ export default function Footer() {
           <div className="footer-col">
             <h4>Company</h4>
             <ul>
-              {["About", "Pricing", "Privacy Policy", "Terms of Service", "Contact"].map((l) => (
-                <li key={l}><a href="#">{l}</a></li>
+              {[
+                { label: "About", href: "/about" },
+                { label: "Privacy Policy", href: "#" },
+                { label: "Terms of Service", href: "#" },
+                { label: "Contact", href: "#" },
+              ].map((l) => (
+                <li key={l.label}><Link href={l.href}>{l.label}</Link></li>
               ))}
             </ul>
           </div>
@@ -63,7 +76,7 @@ export default function Footer() {
               </div>
             ))}
           </div>
-          <span className="footer-copy">© 2024 PDFKit Pro</span>
+          <span className="footer-copy">© 2026 PDFKit Pro</span>
         </div>
       </div>
     </footer>
