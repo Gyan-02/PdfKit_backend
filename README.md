@@ -405,22 +405,6 @@ You need **3 terminal windows** running simultaneously:
 
 ---
 
-## 🔑 Google OAuth Setup (Optional)
-
-If you want Google sign-in to work:
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project (or use an existing one)
-3. Go to **APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client IDs**
-4. Set **Application type** to **Web application**
-5. Add `http://localhost:3000` to **Authorized JavaScript origins**
-6. Add `http://localhost:3000` to **Authorized redirect URIs**
-7. Copy the **Client ID** and paste it into:
-   - `backend/.env` → `GOOGLE_CLIENT_ID`
-   - `frontend/.env.local` → `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
-
----
-
 ## 🐛 Troubleshooting
 
 ### `npm install` fails
